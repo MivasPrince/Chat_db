@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from PIL import Image
+import os
+from io import BytesIO
+import xlsxwriter
 from utils.database import (
     list_tables, get_table_data, get_table_metadata,
     get_table_count, list_columns
@@ -22,6 +26,22 @@ st.set_page_config(
 if 'authenticated' not in st.session_state or not st.session_state.authenticated:
     st.error("Please login from the main page to access this section.")
     st.stop()
+
+# Function to display logo with Navy background
+def display_logo():
+    """Display MIVA logo with Navy background"""
+    try:
+        if os.path.exists("assets/miva_logo.png"):
+            logo = Image.open("assets/miva_logo.png")
+            col1, col2, col3 = st.columns([2, 3, 2])
+            with col2:
+                st.markdown("""
+                <div style="background-color: #000080; padding: 1.5rem; border-radius: 10px; text-align: center; margin-bottom: 2rem;">
+                """, unsafe_allow_html=True)
+                st.image(logo, width=200)
+                st.markdown('</div>', unsafe_allow_html=True)
+    except:
+        pass
 
 # Custom CSS
 st.markdown(f"""
@@ -53,6 +73,9 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# Display logo
+display_logo()
+
 # Header
 st.markdown("""
 <div class="table-header">
@@ -79,16 +102,17 @@ with col1:
         try:
             count = get_table_count(table)
             metadata = get_table_metadata(table)
+            size = metadata.get('size', 'N/A') if metadata else 'N/A'
             
             # Create clickable table card
             if st.button(
-                f"📊 {table}\n{count:,} rows | {metadata.get('size', 'N/A')}",
+                f"📊 {table}\n{count:,} rows | {size}",
                 key=f"btn_{table}",
                 use_container_width=True
             ):
                 st.session_state.selected_table = table
                 st.session_state.table_data = None  # Reset data
-        except:
+        except Exception as e:
             if st.button(f"📊 {table}", key=f"btn_{table}", use_container_width=True):
                 st.session_state.selected_table = table
                 st.session_state.table_data = None
@@ -102,22 +126,33 @@ with col2:
         # Table header
         st.markdown(f"## 📊 {selected_table}")
         
-        # Load table metadata
-        metadata = get_table_metadata(selected_table)
-        columns_df = list_columns(selected_table)
-        
-        # Display table statistics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Rows", f"{metadata.get('row_count', 0):,}")
-        with col2:
-            st.metric("Total Columns", len(columns_df))
-        with col3:
-            st.metric("Table Size", metadata.get('size', 'N/A'))
-        with col4:
-            pk_count = len(columns_df[columns_df['is_primary_key'] == True]) if not columns_df.empty else 0
-            st.metric("Primary Keys", pk_count)
+        # Load table metadata safely
+        try:
+            metadata = get_table_metadata(selected_table)
+            columns_df = list_columns(selected_table)
+            
+            # Safely get row count
+            row_count = metadata.get('row_count', 0) if metadata else 0
+            if row_count == 0:
+                row_count = get_table_count(selected_table)
+            
+            # Display table statistics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Rows", f"{row_count:,}")
+            with col2:
+                st.metric("Total Columns", len(columns_df) if not columns_df.empty else 0)
+            with col3:
+                st.metric("Table Size", metadata.get('size', 'N/A') if metadata else 'N/A')
+            with col4:
+                pk_count = len(columns_df[columns_df['is_primary_key'] == True]) if not columns_df.empty else 0
+                st.metric("Primary Keys", pk_count)
+            
+        except Exception as e:
+            st.warning(f"Could not load metadata: {e}")
+            row_count = 1000  # Default value
+            columns_df = pd.DataFrame()
         
         st.markdown("---")
         
@@ -127,12 +162,18 @@ with col2:
         col1, col2, col3 = st.columns([2, 1, 1])
         
         with col1:
-            rows_to_load = st.slider(
+            # Fixed slider with safe values
+            max_rows = min(10000, row_count) if row_count > 0 else 10000
+            default_rows = min(1000, max_rows)
+            
+            # Use number input instead of slider to avoid the error
+            rows_to_load = st.number_input(
                 "Number of rows to load:",
                 min_value=100,
-                max_value=min(10000, metadata.get('row_count', 10000)),
-                value=min(1000, metadata.get('row_count', 1000)),
-                step=100
+                max_value=max_rows,
+                value=default_rows,
+                step=100,
+                help=f"Maximum available: {row_count:,} rows"
             )
         
         with col2:
@@ -144,12 +185,15 @@ with col2:
         
         if load_btn:
             with st.spinner(f"Loading {rows_to_load} rows from {selected_table}..."):
-                df = get_table_data(selected_table, rows_to_load)
-                if not df.empty:
-                    st.session_state.table_data = df
-                    st.success(f"✅ Loaded {len(df)} rows successfully!")
-                else:
-                    st.error("Failed to load data.")
+                try:
+                    df = get_table_data(selected_table, int(rows_to_load))
+                    if not df.empty:
+                        st.session_state.table_data = df
+                        st.success(f"✅ Loaded {len(df)} rows successfully!")
+                    else:
+                        st.error("Failed to load data or table is empty.")
+                except Exception as e:
+                    st.error(f"Error loading data: {e}")
         
         # Display data and visualizations if loaded
         if 'table_data' in st.session_state and st.session_state.table_data is not None:
@@ -174,7 +218,7 @@ with col2:
                     columns_to_show = st.multiselect(
                         "Select columns:",
                         df.columns.tolist(),
-                        default=df.columns.tolist()[:10]  # Show first 10 columns by default
+                        default=df.columns.tolist()[:min(10, len(df.columns))]  # Show first 10 columns by default
                     )
                 
                 # Apply search filter
@@ -189,7 +233,11 @@ with col2:
                 # Display data
                 st.dataframe(display_df, use_container_width=True)
                 
+                # Display info
+                st.info(f"Showing {len(display_df)} rows × {len(display_df.columns)} columns")
+                
                 # Export options
+                st.markdown("### 💾 Export Data")
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -204,19 +252,38 @@ with col2:
                 
                 with col2:
                     # Excel export
-                    from io import BytesIO
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        display_df.to_excel(writer, sheet_name=selected_table, index=False)
-                    excel_data = output.getvalue()
-                    
-                    st.download_button(
-                        "📥 Download as Excel",
-                        data=excel_data,
-                        file_name=f"{selected_table}_data.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
+                    try:
+                        output = BytesIO()
+                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                            display_df.to_excel(writer, sheet_name=selected_table[:31], index=False)  # Sheet name max 31 chars
+                            
+                            # Get the workbook and worksheet
+                            workbook = writer.book
+                            worksheet = writer.sheets[selected_table[:31]]
+                            
+                            # Add a format for headers
+                            header_format = workbook.add_format({
+                                'bold': True,
+                                'bg_color': '#000080',
+                                'font_color': 'white',
+                                'border': 1
+                            })
+                            
+                            # Write the headers
+                            for col_num, value in enumerate(display_df.columns.values):
+                                worksheet.write(0, col_num, value, header_format)
+                        
+                        excel_data = output.getvalue()
+                        
+                        st.download_button(
+                            "📥 Download as Excel",
+                            data=excel_data,
+                            file_name=f"{selected_table}_data.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Error creating Excel file: {e}")
             
             with tab2:
                 st.markdown("### 📊 Automatic Visualizations")
@@ -368,8 +435,10 @@ with col2:
                         st.metric("Unique Percentage", f"{(col_data.nunique() / len(col_data) * 100):.2f}%")
                         
                         if col_data.dtype in ['object', 'category']:
-                            most_common = col_data.value_counts().iloc[0] if not col_data.value_counts().empty else 'N/A'
-                            st.metric("Most Common Value", most_common)
+                            value_counts = col_data.value_counts()
+                            if not value_counts.empty:
+                                most_common = value_counts.iloc[0]
+                                st.metric("Most Common", f"{value_counts.index[0]} ({most_common})")
                     
                     with col3:
                         if col_data.dtype in [np.number]:
@@ -377,48 +446,7 @@ with col2:
                             st.metric("Mean", f"{col_data.mean():.2f}")
                             st.metric("Median", f"{col_data.median():.2f}")
                             st.metric("Std Dev", f"{col_data.std():.2f}")
-                            st.metric("Min / Max", f"{col_data.min():.2f} / {col_data.max():.2f}")
-                    
-                    # Value distribution
-                    st.markdown("#### Value Distribution")
-                    
-                    if col_data.dtype in ['object', 'category']:
-                        value_counts = col_data.value_counts().head(20)
-                        
-                        if len(value_counts) > 0:
-                            fig_bar = create_bar_chart(
-                                pd.DataFrame({'Value': value_counts.index.astype(str), 'Count': value_counts.values}),
-                                'Count', 'Value',
-                                title=f"Top {len(value_counts)} Values in {selected_column}"
-                            )
-                            fig_bar.update_traces(orientation='h')
-                            st.plotly_chart(fig_bar, use_container_width=True)
-                            
-                            # Show value counts table
-                            st.markdown("##### Value Frequency Table")
-                            freq_df = pd.DataFrame({
-                                'Value': value_counts.index,
-                                'Count': value_counts.values,
-                                'Percentage': (value_counts.values / len(col_data) * 100).round(2)
-                            })
-                            st.dataframe(freq_df, use_container_width=True, hide_index=True)
-                    
-                    elif col_data.dtype in [np.number]:
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            fig_hist = create_histogram(
-                                df, selected_column,
-                                title=f"Distribution of {selected_column}"
-                            )
-                            st.plotly_chart(fig_hist, use_container_width=True)
-                        
-                        with col2:
-                            fig_box = create_box_plot(
-                                df, selected_column,
-                                title=f"Box Plot of {selected_column}"
-                            )
-                            st.plotly_chart(fig_box, use_container_width=True)
+                            st.metric("Range", f"{col_data.min():.2f} - {col_data.max():.2f}")
             
             with tab5:
                 st.markdown("### 🗂️ Table Schema")
@@ -446,38 +474,6 @@ with col2:
                     ]
                     
                     st.dataframe(display_schema, use_container_width=True, hide_index=True)
-                    
-                    # Show indexes if available
-                    if metadata.get('indexes'):
-                        st.markdown("#### 🔑 Table Indexes")
-                        indexes_df = pd.DataFrame(
-                            metadata['indexes'],
-                            columns=['Index Name', 'Definition']
-                        )
-                        st.dataframe(indexes_df, use_container_width=True, hide_index=True)
-                    
-                    # SQL Create Table statement
-                    st.markdown("#### 📝 SQL Definition")
-                    
-                    create_statement = f"CREATE TABLE {selected_table} (\n"
-                    for _, row in schema_df.iterrows():
-                        create_statement += f"    {row['column_name']} {row['data_type']}"
-                        if row['is_nullable'] == 'NO':
-                            create_statement += " NOT NULL"
-                        if row['column_default'] and row['column_default'] != '-':
-                            create_statement += f" DEFAULT {row['column_default']}"
-                        create_statement += ",\n"
-                    
-                    # Add primary key constraint
-                    pk_cols = schema_df[schema_df['is_primary_key'] == True]['column_name'].tolist()
-                    if pk_cols:
-                        create_statement += f"    PRIMARY KEY ({', '.join(pk_cols)})\n"
-                    else:
-                        create_statement = create_statement.rstrip(',\n') + "\n"
-                    
-                    create_statement += ");"
-                    
-                    st.code(create_statement, language='sql')
         
         else:
             st.info("👆 Click 'Load Data' to view table contents and generate visualizations.")
@@ -492,3 +488,9 @@ st.info("""
 - Export data in CSV or Excel format for external analysis
 - Column Analysis tab provides detailed statistics for individual columns
 """)
+
+st.markdown("""
+<div style='text-align: center; color: #666; margin-top: 2rem;'>
+    <p>© 2025 MIVA Open University. All rights reserved.</p>
+</div>
+""", unsafe_allow_html=True)
