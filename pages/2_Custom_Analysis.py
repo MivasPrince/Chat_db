@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 import xlsxwriter
+from PIL import Image
+import os
 from utils.database import execute_query, list_tables
 from utils.visualizations import COLORS
 
@@ -16,6 +18,22 @@ st.set_page_config(
 if 'authenticated' not in st.session_state or not st.session_state.authenticated:
     st.error("Please login from the main page to access this section.")
     st.stop()
+
+# Function to display logo with Navy background
+def display_logo():
+    """Display MIVA logo with Navy background"""
+    try:
+        if os.path.exists("assets/miva_logo.png"):
+            logo = Image.open("assets/miva_logo.png")
+            col1, col2, col3 = st.columns([2, 3, 2])
+            with col2:
+                st.markdown("""
+                <div style="background-color: #000080; padding: 1.5rem; border-radius: 10px; text-align: center; margin-bottom: 2rem;">
+                """, unsafe_allow_html=True)
+                st.image(logo, width=200)
+                st.markdown('</div>', unsafe_allow_html=True)
+    except:
+        pass
 
 # Custom CSS
 st.markdown(f"""
@@ -42,6 +60,9 @@ st.markdown(f"""
 }}
 </style>
 """, unsafe_allow_html=True)
+
+# Display logo
+display_logo()
 
 # Header
 st.markdown("""
@@ -73,7 +94,7 @@ with st.sidebar:
             "Filter Template": f"SELECT *\nFROM {selected_table}\nWHERE column_name = 'value'\nLIMIT 100;",
             "Join Template": f"SELECT t1.*, t2.column\nFROM {selected_table} t1\nJOIN other_table t2 ON t1.id = t2.id\nLIMIT 100;",
             "Aggregate Functions": f"SELECT \n  COUNT(*) as count,\n  AVG(numeric_column) as average,\n  MAX(numeric_column) as maximum,\n  MIN(numeric_column) as minimum\nFROM {selected_table};",
-            "Date Filter": f"SELECT *\nFROM {selected_table}\nWHERE date_column >= '2024-01-01'\n  AND date_column <= '2024-12-31'\nORDER BY date_column DESC;"
+            "Date Filter": f"SELECT *\nFROM {selected_table}\nWHERE date_column >= '2025-01-01'\n  AND date_column <= '2025-12-31'\nORDER BY date_column DESC;"
         }
         
         template_choice = st.selectbox("Choose a template:", list(templates.keys()))
@@ -364,3 +385,9 @@ st.info("""
 - Export results in your preferred format (CSV, Excel, JSON)
 - Check the SQL Reference tab for syntax help
 """)
+
+st.markdown("""
+<div style='text-align: center; color: #666; margin-top: 2rem;'>
+    <p>© 2025 MIVA Open University. All rights reserved.</p>
+</div>
+""", unsafe_allow_html=True)
