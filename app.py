@@ -192,7 +192,9 @@ def load_logo():
         # Display logo with navy background
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+            st.markdown("""
+            <div style="background-color: #000080; padding: 2rem; border-radius: 10px; text-align: center; margin-bottom: 2rem;">
+            """, unsafe_allow_html=True)
             st.image(logo, width=300)
             st.markdown('</div>', unsafe_allow_html=True)
             
