@@ -1,359 +1,337 @@
-# app.py
-
 import streamlit as st
-import psycopg2
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import hashlib
-import io
+import os
+from dotenv import load_dotenv
+import requests
+from PIL import Image
+from io import BytesIO
 
-# --- Page Configuration ---
+# Load environment variables
+load_dotenv()
+
+# Import custom modules
+from utils.auth import check_authentication
+from utils.database import get_connection, test_connection
+
+# Page configuration
 st.set_page_config(
-    page_title="MIVA Open University - M&E Dashboard",
-    page_icon="📊",
+    page_title="MIVA Data Dashboard",
+    page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for MIVA Branding ---
-st.markdown("""
-<style>
-    :root {
-        --miva-navy: #1a237e;
-        --miva-red: #d32f2f;
-        --miva-ash: #9e9e9e;
+# Custom CSS for branding
+def load_custom_css():
+    st.markdown("""
+    <style>
+    /* Main header styling */
+    .main-header {
+        background: linear-gradient(135deg, #000080 0%, #1e3c72 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
-    .main-header {
-        background: linear-gradient(135deg, var(--miva-navy) 0%, var(--miva-red) 100%);
+    /* Logo container */
+    .logo-container {
+        background-color: #000080;
         padding: 1.5rem;
         border-radius: 10px;
-        color: white;
-        text-align: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
         margin-bottom: 2rem;
     }
     
-    .logo-container {
-        background-color: var(--miva-navy);
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-        margin-bottom: 1.5rem;
-    }
-    
+    /* Card styling */
     .metric-card {
-        background: white;
+        background-color: white;
         padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border-left: 4px solid var(--miva-red);
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #DC143C;
         margin-bottom: 1rem;
     }
     
-    .stButton>button {
-        background-color: var(--miva-navy);
+    /* Button styling */
+    .stButton > button {
+        background-color: #DC143C;
         color: white;
-        border-radius: 5px;
         border: none;
-        padding: 0.5rem 2rem;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .stButton > button:hover {
+        background-color: #B91C3C;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: #F5F5F5;
+    }
+    
+    /* Success/Error messages */
+    .stSuccess {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+    
+    .stError {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+    
+    /* Table styling */
+    .dataframe {
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+    }
+    
+    /* Headers */
+    h1 {
+        color: #000080;
+        font-weight: 700;
+    }
+    
+    h2, h3 {
+        color: #1e3c72;
+        font-weight: 600;
+    }
+    
+    /* Navigation tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #F5F5F5;
+        border-radius: 10px;
+        padding: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        color: #000080;
         font-weight: 500;
     }
     
-    .stButton>button:hover {
-        background-color: var(--miva-red);
-    }
-    
-    .table-header {
-        background-color: var(--miva-navy);
-        color: white;
-        padding: 1rem;
+    .stTabs [aria-selected="true"] {
+        background-color: #DC143C !important;
+        color: white !important;
         border-radius: 5px;
-        margin-bottom: 1rem;
     }
-</style>
-""", unsafe_allow_html=True)
-
-# --- Authentication ---
-def hash_password(password):
-    """Hashes password using SHA-256."""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def check_credentials(username, password):
-    """Validates credentials against secrets.toml."""
-    try:
-        correct_username = (username == st.secrets["auth"]["username"])
-        correct_password = (hash_password(password) == st.secrets["auth"]["hashed_password"])
-        return correct_username and correct_password
-    except Exception:
-        st.error("Authentication configuration missing in secrets.toml.")
-        return False
-
-def login_page():
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("""
-        <div class="logo-container">
-            <img src="https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png" width="200">
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div class="main-header">
-            <h2>Monitoring & Evaluation Dashboard</h2>
-            <p>AI Chatbot Analytics & Insights</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("### Please Login")
-        username = st.text_input("Username", key="username")
-        password = st.text_input("Password", type="password", key="password")
-        
-        if st.button("Login", use_container_width=True):
-            if check_credentials(username, password):
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Invalid credentials. Please try again.")
-
-# --- Database Functions ---
-@st.cache_data(ttl=300)
-def load_table_data(table_name, limit=None):
-    """Loads data from a table using credentials from st.secrets."""
-    query = f'SELECT * FROM public."{table_name}"'
-    if limit:
-        query += f" LIMIT {limit}"
-    try:
-        with psycopg2.connect(**st.secrets["database"]) as conn:
-            return pd.read_sql(query, conn)
-    except Exception as e:
-        st.error(f"Database error: {e}")
-        return pd.DataFrame()
-
-@st.cache_data(ttl=300)
-def execute_custom_query(query):
-    """Executes a custom read-only query."""
-    try:
-        with psycopg2.connect(**st.secrets["database"]) as conn:
-            return pd.read_sql(query, conn)
-    except Exception as e:
-        st.error(f"Query Error: {e}")
-        return pd.DataFrame()
-
-@st.cache_data(ttl=300)
-def get_table_stats():
-    """Gets row counts for all tables."""
-    tables = ['chat_feedback', 'chat_sessions', 'chat_messages', 'otp_verifications', 'user_feedback', 'conversation_history']
-    stats = {}
-    try:
-        with psycopg2.connect(**st.secrets["database"]) as conn:
-            cursor = conn.cursor()
-            for table in tables:
-                try:
-                    cursor.execute(f'SELECT COUNT(*) FROM public."{table}"')
-                    stats[table] = cursor.fetchone()[0]
-                except psycopg2.Error:
-                    stats[table] = 0
-            return stats
-    except Exception as e:
-        st.error(f"Database connection error: {e}")
-        return {table: 0 for table in tables}
-
-@st.cache_data
-def to_excel(df):
-    """Converts DataFrame to Excel file in memory."""
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
-    return output.getvalue()
-
-# --- Generic Page Function ---
-def create_table_page(table_name, title, emoji):
-    """Generic function to display a table, metrics, and download buttons."""
-    st.markdown(f'<div class="table-header"><h2>{emoji} {title}</h2></div>', unsafe_allow_html=True)
-    limit = 5000 if table_name in ["chat_messages", "conversation_history"] else None
-    df = load_table_data(table_name, limit=limit)
-
-    if df.empty:
-        st.warning(f"No data available in the '{table_name}' table.")
-        return
-
-    st.metric(f"Total Records Displayed", f"{len(df):,}")
-    st.dataframe(df, use_container_width=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button("📥 Download CSV", df.to_csv(index=False), f"{table_name}_{datetime.now().strftime('%Y%m%d')}.csv")
-    with col2:
-        st.download_button("📥 Download Excel", to_excel(df), f"{table_name}_{datetime.now().strftime('%Y%m%d')}.xlsx")
-
-
-# --- Page Implementations ---
-def show_overview():
-    st.markdown("""
-    <div class="main-header">
-        <h1>📊 Dashboard Overview</h1>
-        <p>Comprehensive view of all database tables and key metrics</p>
-    </div>
+    </style>
     """, unsafe_allow_html=True)
+
+def load_logo():
+    """Load and display MIVA logo"""
+    try:
+        # Try to load from local file first
+        if os.path.exists("assets/miva_logo.png"):
+            logo = Image.open("assets/miva_logo.png")
+        else:
+            # Download from URL if not available locally
+            response = requests.get("https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png")
+            logo = Image.open(BytesIO(response.content))
+            
+            # Save for future use
+            os.makedirs("assets", exist_ok=True)
+            logo.save("assets/miva_logo.png")
+        
+        # Display logo with navy background
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+            st.image(logo, width=300)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+    except Exception as e:
+        st.error(f"Could not load logo: {e}")
+
+def initialize_session_state():
+    """Initialize session state variables"""
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'username' not in st.session_state:
+        st.session_state.username = None
+    if 'db_connected' not in st.session_state:
+        st.session_state.db_connected = False
+
+def main():
+    """Main application"""
+    # Initialize session state
+    initialize_session_state()
     
-    stats = get_table_stats()
+    # Load custom CSS
+    load_custom_css()
     
-    st.subheader("📈 Database Summary")
-    cols = st.columns(3)
+    # Check authentication
+    if not st.session_state.authenticated:
+        # Display logo
+        load_logo()
+        
+        # Login page
+        st.markdown('<div class="main-header">', unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: white;'>MIVA Open University</h1>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #F5F5F5;'>Data Monitoring & Evaluation Dashboard</h3>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Login form
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            with st.form("login_form"):
+                st.markdown("### 🔐 Login")
+                username = st.text_input("Username", placeholder="Enter username")
+                password = st.text_input("Password", type="password", placeholder="Enter password")
+                submit = st.form_submit_button("Login", use_container_width=True)
+                
+                if submit:
+                    if check_authentication(username, password):
+                        st.session_state.authenticated = True
+                        st.session_state.username = username
+                        
+                        # Test database connection
+                        if test_connection():
+                            st.session_state.db_connected = True
+                            st.success("✅ Login successful! Redirecting...")
+                            st.rerun()
+                        else:
+                            st.error("⚠️ Login successful but database connection failed. Please check configuration.")
+                    else:
+                        st.error("❌ Invalid username or password")
     
-    table_names = {
-        'chat_feedback': ('💬 Chat Feedback', '#d32f2f'),
-        'chat_sessions': ('🗨️ Chat Sessions', '#1a237e'),
-        'chat_messages': ('📝 Messages', '#f57c00'),
-        'otp_verifications': ('🔐 OTP Verifications', '#388e3c'),
-        'user_feedback': ('⭐ User Feedback', '#7b1fa2'),
-        'conversation_history': ('📜 Conversations', '#0288d1')
-    }
-    
-    for idx, (table, count) in enumerate(stats.items()):
-        with cols[idx % 3]:
-            name, color = table_names.get(table, (table, '#9e9e9e'))
-            st.markdown(f"""
-            <div class="metric-card" style="border-left-color: {color}">
-                <h3>{name}</h3>
-                <h2 style="color: {color}">{count:,}</h2>
-                <p>Total Records</p>
+    else:
+        # Main application after login
+        # Sidebar
+        with st.sidebar:
+            # Logo in sidebar
+            st.markdown('<div style="background-color: #000080; padding: 1rem; border-radius: 10px;">', unsafe_allow_html=True)
+            try:
+                if os.path.exists("assets/miva_logo.png"):
+                    logo = Image.open("assets/miva_logo.png")
+                    st.image(logo, use_column_width=True)
+            except:
+                pass
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # User info
+            st.markdown(f"### 👤 Welcome, {st.session_state.username}")
+            
+            # Database connection status
+            if st.session_state.db_connected:
+                st.success("🟢 Database Connected")
+            else:
+                st.error("🔴 Database Disconnected")
+            
+            st.markdown("---")
+            
+            # Navigation menu
+            st.markdown("### 📍 Navigation")
+            st.markdown("""
+            - **📊 Overview**: Database summary and statistics
+            - **🔍 Custom Analysis**: SQL query interface
+            - **📈 Advanced Analytics**: Filtered visualizations
+            - **📋 Table Views**: Individual table analysis
+            """)
+            
+            st.markdown("---")
+            
+            # Logout button
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.authenticated = False
+                st.session_state.username = None
+                st.session_state.db_connected = False
+                st.rerun()
+        
+        # Main content area
+        st.markdown('<div class="main-header">', unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: white;'>📊 MIVA Data Dashboard</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #F5F5F5;'>Monitoring & Evaluation System</p>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Welcome message and instructions
+        st.markdown("## Welcome to MIVA Data Dashboard")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div class="metric-card">
+                <h3>📊 Overview</h3>
+                <p>Get a comprehensive view of all database tables and their statistics.</p>
             </div>
             """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    
-    df_feedback = load_table_data("chat_feedback")
-    if not df_feedback.empty:
-        with col1:
-            if 'created_at' in df_feedback.columns:
-                df_feedback['created_at'] = pd.to_datetime(df_feedback['created_at'])
-                df_feedback['date'] = df_feedback['created_at'].dt.date
-                daily_feedback = df_feedback.groupby('date').size().reset_index(name='count')
-                fig = px.line(daily_feedback, x='date', y='count', title='Daily Feedback Trend', color_discrete_sequence=['#d32f2f'])
-                st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            if 'feedback_type' in df_feedback.columns:
-                feedback_dist = df_feedback['feedback_type'].value_counts()
-                fig = px.pie(values=feedback_dist.values, names=feedback_dist.index, title='Feedback Type Distribution', color_discrete_sequence=['#1a237e', '#d32f2f', '#9e9e9e'])
-                st.plotly_chart(fig, use_container_width=True)
-
-def show_custom_analysis():
-    st.markdown('<div class="table-header"><h2>🔍 Custom SQL Analysis</h2></div>', unsafe_allow_html=True)
-    
-    st.warning("️️⚠️ **Security Advisory:** This feature runs live SQL queries. For security, connect to the database with a **read-only user** to prevent accidental or malicious data modification or deletion.", icon="🚨")
-    
-    st.markdown("""
-    **Available Tables:** `chat_feedback`, `chat_sessions`, `chat_messages`, `otp_verifications`, `user_feedback`, `conversation_history`
-    """)
-    
-    sample_query = "SELECT email, rating, feedback_type \nFROM public.chat_feedback \nWHERE rating < 3 \nLIMIT 100;"
-    query = st.text_area("SQL Query:", value=sample_query, height=150)
-    
-    if st.button("🚀 Execute Query"):
-        result_df = execute_custom_query(query)
-        if not result_df.empty:
-            st.success(f"✅ Query returned {len(result_df)} rows.")
-            st.dataframe(result_df, use_container_width=True)
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button("📥 CSV", result_df.to_csv(index=False), f"query_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-            with col2:
-                st.download_button("📥 Excel", to_excel(result_df), f"query_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
-        else:
-            st.info("Query executed, but returned no data.")
-
-def show_advanced_analytics():
-    st.markdown('<div class="table-header"><h2>📈 Advanced Analytics (Chat Feedback)</h2></div>', unsafe_allow_html=True)
-    
-    df = load_table_data("chat_feedback")
-    if df.empty:
-        st.warning("No chat feedback data available for analysis.")
-        return
+            st.markdown("""
+            <div class="metric-card">
+                <h3>🔍 Custom Analysis</h3>
+                <p>Write custom SQL queries and export results to CSV or Excel.</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        users = ['All'] + df['email'].unique().tolist() if 'email' in df.columns else ['All']
-        selected_user = st.selectbox("Filter by User Email", users)
-    with col2:
-        ratings = ['All'] + sorted(df['rating'].dropna().unique().tolist()) if 'rating' in df.columns else ['All']
-        selected_rating = st.selectbox("Filter by Rating", ratings)
-    with col3:
-        types = ['All'] + df['feedback_type'].unique().tolist() if 'feedback_type' in df.columns else ['All']
-        selected_type = st.selectbox("Filter by Feedback Type", types)
-    
-    filtered_df = df.copy()
-    if selected_user != 'All':
-        filtered_df = filtered_df[filtered_df['email'] == selected_user]
-    if selected_rating != 'All':
-        filtered_df = filtered_df[filtered_df['rating'] == selected_rating]
-    if selected_type != 'All':
-        filtered_df = filtered_df[filtered_df['feedback_type'] == selected_type]
-    
-    st.subheader(f"Filtered Results: {len(filtered_df)} records")
-    
-    if not filtered_df.empty and 'rating' in filtered_df.columns:
-        fig = px.histogram(filtered_df, x='rating', nbins=5, title='Rating Distribution', color_discrete_sequence=['#1a237e'])
-        st.plotly_chart(fig, use_container_width=True)
-    
-    st.dataframe(filtered_df, use_container_width=True)
-
-# --- Main App Router ---
-def main_dashboard():
-    with st.sidebar:
-        st.markdown("""
-        <div class="logo-container">
-            <img src="https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png" width="150">
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("### Navigation")
-        page = st.selectbox("Select Page", [
-            "📊 Overview",
-            "💬 Chat Feedback",
-            "🗨️ Chat Sessions", 
-            "📝 Chat Messages",
-            "🔐 OTP Verifications",
-            "⭐ User Feedback",
-            "📜 Conversation History",
-            "---",
-            "🔍 Custom Analysis",
-            "📈 Advanced Analytics"
-        ])
+        with col3:
+            st.markdown("""
+            <div class="metric-card">
+                <h3>📈 Advanced Analytics</h3>
+                <p>Filter and analyze data with interactive visualizations.</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.markdown("---")
-        if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.authenticated = False
-            st.rerun()
-    
-    if page == "📊 Overview":
-        show_overview()
-    elif page == "💬 Chat Feedback":
-        create_table_page("chat_feedback", "Chat Feedback", "💬")
-    elif page == "🗨️ Chat Sessions":
-        create_table_page("chat_sessions", "Chat Sessions", "🗨️")
-    elif page == "📝 Chat Messages":
-        create_table_page("chat_messages", "Chat Messages", "📝")
-    elif page == "🔐 OTP Verifications":
-        create_table_page("otp_verifications", "OTP Verifications", "🔐")
-    elif page == "⭐ User Feedback":
-        create_table_page("user_feedback", "User Feedback", "⭐")
-    elif page == "📜 Conversation History":
-        create_table_page("conversation_history", "Conversation History", "📜")
-    elif page == "🔍 Custom Analysis":
-        show_custom_analysis()
-    elif page == "📈 Advanced Analytics":
-        show_advanced_analytics()
+        
+        # Quick stats (if connected to database)
+        if st.session_state.db_connected:
+            st.markdown("### 📊 Quick Statistics")
+            
+            try:
+                from utils.database import get_table_stats
+                stats = get_table_stats()
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Total Tables", stats.get('table_count', 0))
+                
+                with col2:
+                    st.metric("Total Columns", stats.get('total_columns', 0))
+                
+                with col3:
+                    st.metric("Total Records", f"{stats.get('total_records', 0):,}")
+                
+                with col4:
+                    st.metric("Database Size", stats.get('db_size', 'N/A'))
+                    
+            except Exception as e:
+                st.warning(f"Could not load statistics: {e}")
+        
+        st.markdown("---")
+        
+        # Instructions
+        st.info("""
+        **Getting Started:**
+        1. Use the sidebar to navigate between different sections
+        2. **Overview** - View summary statistics and metadata for all tables
+        3. **Custom Analysis** - Write and execute custom SQL queries
+        4. **Advanced Analytics** - Use filters to generate specific visualizations
+        5. **Table Views** - Access dedicated visualization pages for each table
+        
+        Select a page from the sidebar to begin your analysis.
+        """)
+        
+        # Footer
+        st.markdown("---")
+        st.markdown("""
+        <div style='text-align: center; color: #666;'>
+            <p>© 2024 MIVA Open University. All rights reserved.</p>
+            <p>Data Monitoring & Evaluation Dashboard v1.0</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-# --- App Entry Point ---
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    login_page()
-else:
-    main_dashboard()
+if __name__ == "__main__":
+    main()
