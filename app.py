@@ -189,14 +189,26 @@ def load_logo():
             os.makedirs("assets", exist_ok=True)
             logo.save("assets/miva_logo.png")
         
-        # Display logo with navy background
+        # Create a navy background for the logo
+        # Get logo dimensions
+        logo_width, logo_height = logo.size
+        
+        # Create a new image with navy background
+        background_width = logo_width + 100  # Add padding
+        background_height = logo_height + 100  # Add padding
+        background = Image.new('RGBA', (background_width, background_height), (0, 0, 128, 255))  # Navy blue
+        
+        # Calculate position to center logo on background
+        x = (background_width - logo_width) // 2
+        y = (background_height - logo_height) // 2
+        
+        # Paste logo onto navy background
+        background.paste(logo, (x, y), logo if logo.mode == 'RGBA' else None)
+        
+        # Display the combined image
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.markdown("""
-            <div style="background-color: #000080; padding: 2rem; border-radius: 10px; text-align: center; margin-bottom: 2rem;">
-            """, unsafe_allow_html=True)
-            st.image(logo, width=300)
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.image(background, width=400)
             
     except Exception as e:
         st.error(f"Could not load logo: {e}")
@@ -206,18 +218,30 @@ def display_sidebar_logo():
     try:
         if os.path.exists("assets/miva_logo.png"):
             logo = Image.open("assets/miva_logo.png")
-            st.markdown('<div class="sidebar-logo-container">', unsafe_allow_html=True)
-            st.image(logo, use_column_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             # Try to download if not exists
             response = requests.get("https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png")
             logo = Image.open(BytesIO(response.content))
             os.makedirs("assets", exist_ok=True)
             logo.save("assets/miva_logo.png")
-            st.markdown('<div class="sidebar-logo-container">', unsafe_allow_html=True)
-            st.image(logo, use_column_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Create a navy background for the logo
+        logo_width, logo_height = logo.size
+        
+        # Create a new image with navy background (smaller padding for sidebar)
+        background_width = logo_width + 40  # Less padding for sidebar
+        background_height = logo_height + 40
+        background = Image.new('RGBA', (background_width, background_height), (0, 0, 128, 255))  # Navy blue
+        
+        # Calculate position to center logo on background
+        x = (background_width - logo_width) // 2
+        y = (background_height - logo_height) // 2
+        
+        # Paste logo onto navy background
+        background.paste(logo, (x, y), logo if logo.mode == 'RGBA' else None)
+        
+        # Display the combined image
+        st.image(background, use_column_width=True)
     except:
         pass
 
