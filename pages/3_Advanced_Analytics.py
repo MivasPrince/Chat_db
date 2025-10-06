@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from PIL import Image
+import os
 from utils.database import list_tables, get_table_data, execute_query
 from utils.visualizations import (
     create_bar_chart, create_line_chart, create_scatter_plot,
@@ -20,6 +22,22 @@ st.set_page_config(
 if 'authenticated' not in st.session_state or not st.session_state.authenticated:
     st.error("Please login from the main page to access this section.")
     st.stop()
+
+# Function to display logo with Navy background
+def display_logo():
+    """Display MIVA logo with Navy background"""
+    try:
+        if os.path.exists("assets/miva_logo.png"):
+            logo = Image.open("assets/miva_logo.png")
+            col1, col2, col3 = st.columns([2, 3, 2])
+            with col2:
+                st.markdown("""
+                <div style="background-color: #000080; padding: 1.5rem; border-radius: 10px; text-align: center; margin-bottom: 2rem;">
+                """, unsafe_allow_html=True)
+                st.image(logo, width=200)
+                st.markdown('</div>', unsafe_allow_html=True)
+    except:
+        pass
 
 # Custom CSS
 st.markdown(f"""
@@ -47,6 +65,9 @@ st.markdown(f"""
 }}
 </style>
 """, unsafe_allow_html=True)
+
+# Display logo
+display_logo()
 
 # Header
 st.markdown("""
@@ -417,3 +438,9 @@ st.info("""
 - Use different tabs to explore various aspects of your data
 - Export visualizations using the download button in each chart
 """)
+
+st.markdown("""
+<div style='text-align: center; color: #666; margin-top: 2rem;'>
+    <p>© 2025 MIVA Open University. All rights reserved.</p>
+</div>
+""", unsafe_allow_html=True)
