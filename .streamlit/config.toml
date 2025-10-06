@@ -1,11 +1,15 @@
 [theme]
-primaryColor = "#DC143C"
+primaryColor = "#DC143C"  # Red
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F3F4F6"
-textColor = "#1F2937"
+secondaryBackgroundColor = "#F5F5F5"  # Ash
+textColor = "#000080"  # Navy Blue
 font = "sans serif"
 
 [server]
-headless = true
 port = 8501
 enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 200
+
+[browser]
+gatherUsageStats = false
