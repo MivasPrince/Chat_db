@@ -33,15 +33,23 @@ def load_custom_css():
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
-    /* Logo container */
+    /* Logo container with Navy background */
     .logo-container {
         background-color: #000080;
-        padding: 1.5rem;
+        padding: 2rem;
         border-radius: 10px;
         display: flex;
         justify-content: center;
         align-items: center;
         margin-bottom: 2rem;
+    }
+    
+    /* Sidebar logo container */
+    .sidebar-logo-container {
+        background-color: #000080;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
     }
     
     /* Card styling */
@@ -52,6 +60,25 @@ def load_custom_css():
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         border-left: 4px solid #DC143C;
         margin-bottom: 1rem;
+        transition: all 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+        display: block;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .metric-card h3 {
+        color: #000080;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .metric-card p {
+        color: #666;
+        margin: 0;
     }
     
     /* Button styling */
@@ -123,11 +150,32 @@ def load_custom_css():
         color: white !important;
         border-radius: 5px;
     }
+    
+    /* Link cards */
+    .link-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #DC143C;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        cursor: pointer;
+        margin-bottom: 1rem;
+    }
+    
+    .link-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    a {
+        text-decoration: none;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 def load_logo():
-    """Load and display MIVA logo"""
+    """Load and display MIVA logo with Navy background"""
     try:
         # Try to load from local file first
         if os.path.exists("assets/miva_logo.png"):
@@ -150,6 +198,26 @@ def load_logo():
             
     except Exception as e:
         st.error(f"Could not load logo: {e}")
+
+def display_sidebar_logo():
+    """Display logo in sidebar with Navy background"""
+    try:
+        if os.path.exists("assets/miva_logo.png"):
+            logo = Image.open("assets/miva_logo.png")
+            st.markdown('<div class="sidebar-logo-container">', unsafe_allow_html=True)
+            st.image(logo, use_column_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # Try to download if not exists
+            response = requests.get("https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png")
+            logo = Image.open(BytesIO(response.content))
+            os.makedirs("assets", exist_ok=True)
+            logo.save("assets/miva_logo.png")
+            st.markdown('<div class="sidebar-logo-container">', unsafe_allow_html=True)
+            st.image(logo, use_column_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+    except:
+        pass
 
 def initialize_session_state():
     """Initialize session state variables"""
@@ -205,17 +273,10 @@ def main():
     
     else:
         # Main application after login
-        # Sidebar
+        # Sidebar with logo
         with st.sidebar:
-            # Logo in sidebar
-            st.markdown('<div style="background-color: #000080; padding: 1rem; border-radius: 10px;">', unsafe_allow_html=True)
-            try:
-                if os.path.exists("assets/miva_logo.png"):
-                    logo = Image.open("assets/miva_logo.png")
-                    st.image(logo, use_column_width=True)
-            except:
-                pass
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Logo with Navy background in sidebar
+            display_sidebar_logo()
             
             st.markdown("---")
             
@@ -233,10 +294,11 @@ def main():
             # Navigation menu
             st.markdown("### 📍 Navigation")
             st.markdown("""
-            - **📊 Overview**: Database summary and statistics
-            - **🔍 Custom Analysis**: SQL query interface
-            - **📈 Advanced Analytics**: Filtered visualizations
-            - **📋 Table Views**: Individual table analysis
+            Use the pages below to navigate:
+            - **Overview**: Database summary and statistics
+            - **Custom Analysis**: SQL query interface
+            - **Advanced Analytics**: Filtered visualizations
+            - **Table Views**: Individual table analysis
             """)
             
             st.markdown("---")
@@ -249,37 +311,56 @@ def main():
                 st.rerun()
         
         # Main content area
+        # Display logo at top with Navy background
+        col1, col2, col3 = st.columns([2, 3, 2])
+        with col2:
+            try:
+                if os.path.exists("assets/miva_logo.png"):
+                    logo = Image.open("assets/miva_logo.png")
+                    st.markdown('<div class="sidebar-logo-container" style="text-align: center;">', unsafe_allow_html=True)
+                    st.image(logo, width=200)
+                    st.markdown('</div>', unsafe_allow_html=True)
+            except:
+                pass
+        
         st.markdown('<div class="main-header">', unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center; color: white;'>📊 MIVA Data Dashboard</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: #F5F5F5;'>Monitoring & Evaluation System</p>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Welcome message and instructions
+        # Welcome message and navigation links
         st.markdown("## Welcome to MIVA Data Dashboard")
         
+        # Create clickable navigation cards
         col1, col2, col3 = st.columns(3)
         
         with col1:
+            if st.button("📊 Go to Overview", use_container_width=True, key="nav_overview"):
+                st.switch_page("pages/1_Overview.py")
             st.markdown("""
-            <div class="metric-card">
-                <h3>📊 Overview</h3>
-                <p>Get a comprehensive view of all database tables and their statistics.</p>
+            <div class="link-card">
+                <h4 style="color: #000080; margin: 0;">📊 Overview</h4>
+                <p style="color: #666; margin-top: 0.5rem;">Get a comprehensive view of all database tables and their statistics.</p>
             </div>
             """, unsafe_allow_html=True)
         
         with col2:
+            if st.button("🔍 Go to Custom Analysis", use_container_width=True, key="nav_custom"):
+                st.switch_page("pages/2_Custom_Analysis.py")
             st.markdown("""
-            <div class="metric-card">
-                <h3>🔍 Custom Analysis</h3>
-                <p>Write custom SQL queries and export results to CSV or Excel.</p>
+            <div class="link-card">
+                <h4 style="color: #000080; margin: 0;">🔍 Custom Analysis</h4>
+                <p style="color: #666; margin-top: 0.5rem;">Write custom SQL queries and export results to CSV or Excel.</p>
             </div>
             """, unsafe_allow_html=True)
         
         with col3:
+            if st.button("📈 Go to Advanced Analytics", use_container_width=True, key="nav_advanced"):
+                st.switch_page("pages/3_Advanced_Analytics.py")
             st.markdown("""
-            <div class="metric-card">
-                <h3>📈 Advanced Analytics</h3>
-                <p>Filter and analyze data with interactive visualizations.</p>
+            <div class="link-card">
+                <h4 style="color: #000080; margin: 0;">📈 Advanced Analytics</h4>
+                <p style="color: #666; margin-top: 0.5rem;">Filter and analyze data with interactive visualizations.</p>
             </div>
             """, unsafe_allow_html=True)
         
@@ -315,20 +396,20 @@ def main():
         # Instructions
         st.info("""
         **Getting Started:**
-        1. Use the sidebar to navigate between different sections
+        1. Click on any of the navigation cards above to access specific features
         2. **Overview** - View summary statistics and metadata for all tables
         3. **Custom Analysis** - Write and execute custom SQL queries
         4. **Advanced Analytics** - Use filters to generate specific visualizations
         5. **Table Views** - Access dedicated visualization pages for each table
         
-        Select a page from the sidebar to begin your analysis.
+        You can also use the sidebar to navigate between different sections.
         """)
         
         # Footer
         st.markdown("---")
         st.markdown("""
         <div style='text-align: center; color: #666;'>
-            <p>© 2024 MIVA Open University. All rights reserved.</p>
+            <p>© 2025 MIVA Open University. All rights reserved.</p>
             <p>Data Monitoring & Evaluation Dashboard v1.0</p>
         </div>
         """, unsafe_allow_html=True)
