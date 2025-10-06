@@ -1,12 +1,12 @@
-# Python
+# .gitignore
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+
+# Distribution / packaging
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -22,25 +22,16 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Streamlit
+# Streamlit secrets
 .streamlit/secrets.toml
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Environment variables
+# Environments
 .env
-.env.local
-
-# Logs
-*.log
-
-# Database
-*.db
-*.sqlite
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
