@@ -35,7 +35,7 @@ def load_custom_css():
     
     /* Logo container with Navy background */
     .logo-container {
-        background-color: #000080;
+
         padding: 2rem;
         border-radius: 10px;
         display: flex;
@@ -46,7 +46,7 @@ def load_custom_css():
     
     /* Sidebar logo container */
     .sidebar-logo-container {
-        background-color: #000080;
+
         padding: 1rem;
         border-radius: 10px;
         margin-bottom: 1rem;
@@ -54,7 +54,7 @@ def load_custom_css():
     
     /* Card styling */
     .metric-card {
-        background-color: white;
+        background-color: #000080;
         padding: 1.5rem;
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -84,7 +84,7 @@ def load_custom_css():
     /* Button styling */
     .stButton > button {
         background-color: #DC143C;
-        color: white;
+        color: #000080;
         border: none;
         padding: 0.5rem 1rem;
         border-radius: 5px;
@@ -100,7 +100,7 @@ def load_custom_css():
     
     /* Sidebar styling */
     .css-1d391kg {
-        background-color: #F5F5F5;
+        background-color: #000080;
     }
     
     /* Success/Error messages */
@@ -111,8 +111,8 @@ def load_custom_css():
     }
     
     .stError {
-        background-color: #f8d7da;
-        border-color: #f5c6cb;
+        background-color: #000080;
+        border-color: #000080;
         color: #721c24;
     }
     
@@ -135,7 +135,7 @@ def load_custom_css():
     
     /* Navigation tabs */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #F5F5F5;
+        background-color: #000080;
         border-radius: 10px;
         padding: 0.5rem;
     }
@@ -147,7 +147,7 @@ def load_custom_css():
     
     .stTabs [aria-selected="true"] {
         background-color: #DC143C !important;
-        color: white !important;
+        color: #000080 !important;
         border-radius: 5px;
     }
     
@@ -182,7 +182,7 @@ def load_logo():
             logo = Image.open("assets/miva_logo.png")
         else:
             # Download from URL if not available locally
-            response = requests.get("https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png")
+            response = requests.get(""https://raw.githubusercontent.com/MivasPrince/Chat_db/refs/heads/main/assets/miva.png"")
             logo = Image.open(BytesIO(response.content))
             
             # Save for future use
@@ -220,7 +220,7 @@ def display_sidebar_logo():
             logo = Image.open("assets/miva_logo.png")
         else:
             # Try to download if not exists
-            response = requests.get("https://miva.edu.ng/wp-content/uploads/2023/05/Miva-Logo-White-Vertical-1.png")
+            response = requests.get(""https://raw.githubusercontent.com/MivasPrince/Chat_db/refs/heads/main/assets/miva.png"")
             logo = Image.open(BytesIO(response.content))
             os.makedirs("assets", exist_ok=True)
             logo.save("assets/miva_logo.png")
@@ -269,8 +269,8 @@ def main():
         
         # Login page
         st.markdown('<div class="main-header">', unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align: center; color: white;'>MIVA Open University</h1>", unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center; color: #F5F5F5;'>Data Monitoring & Evaluation Dashboard</h3>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #000080;'>MIVA Open University</h1>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #000080;'>Data Monitoring & Evaluation Dashboard</h3>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Login form
@@ -350,8 +350,8 @@ def main():
                 pass
         
         st.markdown('<div class="main-header">', unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align: center; color: white;'>📊 MIVA Data Dashboard</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #F5F5F5;'>Monitoring & Evaluation System</p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #000080;'>📊 MIVA Data Dashboard</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #000080;'>Monitoring & Evaluation System</p>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Welcome message and navigation links
